@@ -1,0 +1,9 @@
+ubuntu@ip-172-31-32-12:~/day06-file-io$ cat notes.txt
+Line 1 - Linux file practice
+Line 2 - Learning redirection
+Line 3 - Using tee command
+Line 4 - Practicing cat command
+Line 5 - Practicing head command
+Line 6 - Practicing tail command
+Line 7 - DevOps uses text files daily
+Line 8 - File practice completed
