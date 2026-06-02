@@ -209,23 +209,23 @@ The file 'file.txt' does not exist.
 ```
 #!/bin/bash
 
+# Store service name in a variable
 service="sshd"
 
+# Ask user for confirmation
 read -p "Do you want to check the status? (y/n): " choice
 
 if [ "$choice" = "y" ]; then
-
     if systemctl is-active --quiet "$service"; then
         echo "$service is active."
     else
         echo "$service is not active."
     fi
 
+    # Show detailed status
     systemctl status "$service"
-
 elif [ "$choice" = "n" ]; then
     echo "Skipped."
-
 else
     echo "Invalid input. Please enter y or n."
 fi
