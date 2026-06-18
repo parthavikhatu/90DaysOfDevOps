@@ -1,0 +1,429 @@
+# Day 34 – Docker Compose: Real-World Multi-Container Apps
+
+## Objective
+
+The goal of this lab was to build a production-like multi-container application using Docker Compose. The setup includes:
+
+* Flask Web Application
+* PostgreSQL Database
+* Redis Cache
+
+Additionally, I explored:
+
+* Service dependencies
+* Healthchecks
+* Restart policies
+* Custom Dockerfiles
+* Named networks and volumes
+* Application scaling
+
+---
+
+## Project Structure
+
+```text
+day-34-compose-advanced/
+│
+├── docker-compose.yml
+│
+├── app/
+│   ├── Dockerfile
+│   ├── requirements.txt
+│   └── app.py
+│
+└── screenshots/
+```
+
+---
+
+# Task 1: Build a Multi-Service Application Stack
+
+## Flask Application
+
+### app.py
+
+```python
+from flask import Flask
+
+app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return "Docker Compose Multi-Service App Running!"
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
+```
+
+### requirements.txt
+
+```text
+Flask
+psycopg2-binary
+redis
+```
+
+---
+
+## Dockerfile
+
+```dockerfile
+FROM python:3.12-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+EXPOSE 5000
+
+CMD ["python", "app.py"]
+```
+
+---
+
+# Task 2: Docker Compose Configuration
+
+## docker-compose.yml
+
+```yaml
+version: "3.9"
+
+services:
+
+  web:
+    build: ./app
+    container_name: flask-app
+
+    ports:
+      - "5000:5000"
+
+    depends_on:
+      db:
+        condition: service_healthy
+
+    networks:
+      - backend
+
+    labels:
+      project: "docker-compose-lab"
+      environment: "dev"
+
+  db:
+    image: postgres:16
+    container_name: postgres-db
+
+    restart: always
+
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: appdb
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    networks:
+      - backend
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+    labels:
+      project: "docker-compose-lab"
+
+  redis:
+    image: redis:7
+    container_name: redis-cache
+
+    networks:
+      - backend
+
+    labels:
+      project: "docker-compose-lab"
+
+networks:
+  backend:
+
+volumes:
+  postgres_data:
+```
+
+---
+
+# Task 3: depends_on and Healthchecks
+
+The web application depends on PostgreSQL.
+
+To ensure the application starts only after the database is ready, a healthcheck was added.
+
+```yaml
+depends_on:
+  db:
+    condition: service_healthy
+```
+
+Database healthcheck:
+
+```yaml
+healthcheck:
+  test: ["CMD-SHELL", "pg_isready -U admin"]
+  interval: 10s
+  timeout: 5s
+  retries: 5
+```
+
+### Verification
+
+```bash
+docker compose up
+```
+
+Result:
+
+* PostgreSQL starts first
+* Healthcheck passes
+* Flask application starts afterward
+
+---
+
+# Task 4: Restart Policies
+
+## restart: always
+
+```yaml
+restart: always
+```
+
+### Test
+
+```bash
+docker kill postgres-db
+```
+
+Result:
+
+The PostgreSQL container automatically restarted.
+
+### Use Cases
+
+* Databases
+* Production services
+* Critical infrastructure
+
+---
+
+## restart: on-failure
+
+```yaml
+restart: on-failure
+```
+
+### Behavior
+
+Container restarts only if it exits with a non-zero exit code.
+
+### Use Cases
+
+* Background workers
+* Scheduled jobs
+* Batch processing
+
+---
+
+# Task 5: Building Images with Dockerfile
+
+Instead of using a pre-built image, the Flask application is built from source.
+
+```yaml
+web:
+  build: ./app
+```
+
+### Rebuild Application
+
+After making code changes:
+
+```bash
+docker compose up --build -d
+```
+
+Docker rebuilds the image and recreates the container.
+
+---
+
+# Task 6: Named Networks
+
+A custom network was created.
+
+```yaml
+networks:
+  backend:
+```
+
+Benefits:
+
+* Service isolation
+* Easy service discovery
+* Better organization
+
+Verification:
+
+```bash
+docker network ls
+docker network inspect <network-name>
+```
+
+---
+
+# Task 7: Named Volumes
+
+A named volume was created for PostgreSQL data persistence.
+
+```yaml
+volumes:
+  postgres_data:
+```
+
+Mounted as:
+
+```yaml
+volumes:
+  - postgres_data:/var/lib/postgresql/data
+```
+
+Benefits:
+
+* Persistent database storage
+* Data survives container removal
+* Easy backups
+
+Verification:
+
+```bash
+docker volume ls
+docker volume inspect <volume-name>
+```
+
+---
+
+# Task 8: Scaling Containers
+
+Scale the web service:
+
+```bash
+docker compose up -d --scale web=3
+```
+
+### Observation
+
+Scaling creates multiple web containers.
+
+Example:
+
+```text
+web-1
+web-2
+web-3
+```
+
+### Problem
+
+Port conflicts occur because all replicas try to use:
+
+```yaml
+ports:
+  - "5000:5000"
+```
+
+Only one container can bind to host port 5000.
+
+### Why It Happens
+
+Docker Compose does not provide automatic load balancing.
+
+In production, scaling is usually handled using:
+
+* Nginx
+* HAProxy
+* Docker Swarm
+* Kubernetes
+
+---
+
+# Useful Commands
+
+## Start Services
+
+```bash
+docker compose up -d
+```
+
+## Stop Services
+
+```bash
+docker compose down
+```
+
+## View Running Containers
+
+```bash
+docker compose ps
+```
+
+## View Logs
+
+```bash
+docker compose logs
+```
+
+## Rebuild Containers
+
+```bash
+docker compose up --build -d
+```
+
+## Scale Service
+
+```bash
+docker compose up --scale web=3
+```
+
+## View Networks
+
+```bash
+docker network ls
+```
+
+## View Volumes
+
+```bash
+docker volume ls
+```
+
+---
+
+# Learning Outcomes
+
+By completing this lab, I learned:
+
+* How Docker Compose manages multi-container applications
+* How to build custom images using Dockerfiles
+* How service dependencies work with depends_on
+* How healthchecks ensure application readiness
+* How restart policies improve reliability
+* How named networks allow container communication
+* How named volumes provide persistent storage
+* Why scaling applications requires load balancing
+
+---
+
+# Conclusion
+
+Docker Compose simplifies the deployment and management of multi-container applications. Using healthchecks, restart policies, networks, and volumes makes containerized applications more reliable and production-ready. This lab provided hands-on experience with real-world Docker Compose features commonly used in DevOps and cloud environments.
